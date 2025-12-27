@@ -1,0 +1,25 @@
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+  
+  producer:
+    build: .
+    command: uv run producer.py
+    depends_on:
+      - redis
+    environment:
+      - REDIS_HOST=redis
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+  
+  worker:
+    build: .
+    command: uv run worker.py
+    depends_on:
+      - redis
+    environment:
+      - REDIS_HOST=redis
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
