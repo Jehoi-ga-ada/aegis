@@ -3,6 +3,8 @@ import asyncio
 import logging
 from binance_sdk_spot.spot import Spot, SPOT_WS_STREAMS_PROD_URL, ConfigurationWebSocketStreams
 from redis.asyncio import Redis
+from datetime import timedelta
+import aiobreaker
 
 # Initialize Redis Client
 r = Redis(host=os.getenv("REDIS_HOST", "localhost"), port=6379, decode_responses=True)
@@ -13,10 +15,20 @@ configuration_ws_streams = ConfigurationWebSocketStreams(
 )
 client = Spot(config_ws_streams=configuration_ws_streams)
 
+db_breaker = aiobreaker.CircuitBreaker(
+    fail_max=3, 
+    timeout_duration=timedelta(seconds=30),
+)
+
 async def handle_message(msg):
-    if "p" in msg:
-        await r.xadd("market_stream", {"s": msg['s'], "p": msg['p']})
-        print(f"Captured {msg['s']}: {msg['p']}")
+    try:
+        if "p" in msg:
+            await db_breaker.call_async(r.xadd, "market_stream", {"s": msg['s'], "p": msg['p']})
+            print(f"Captured {msg['s']}: {msg['p']}")
+    except aiobreaker.CircuitBreakerError:
+        print("GUARDRAIL: Circuit is OPEN inside background task. Skipping message.")
+    except Exception as e:
+        print(f"TASK ERROR: {e}")
 
 async def trade():
     stop_event = asyncio.Event()
