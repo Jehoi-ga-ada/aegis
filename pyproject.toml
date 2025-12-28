@@ -5,7 +5,10 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "aiobreaker>=1.2.0",
+    "aiolimiter>=1.2.1",
     "binance-sdk-spot>=6.0.0",
     "prometheus-client>=0.23.1",
     "redis>=7.1.0",
+    "tornado>=6.5.4",
 ]
