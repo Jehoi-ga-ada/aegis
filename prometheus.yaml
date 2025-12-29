@@ -1,4 +1,15 @@
 scrape_configs:
+  # 1. Monitor the Worker
   - job_name: 'aegis-worker'
     static_configs:
       - targets: ['worker:8000']
+
+  # 2. Monitor the Vault API
+  - job_name: 'aegis-vault'
+    static_configs:
+      - targets: ['vault:8001']
+
+  # 3. Monitor Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

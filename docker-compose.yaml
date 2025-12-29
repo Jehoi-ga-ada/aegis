@@ -23,7 +23,7 @@ services:
 
   producer:
     build: .
-    command: uv run producer.py
+    command: uv run python -m services.producer
     depends_on:
       redis:
         condition: service_started
@@ -37,7 +37,7 @@ services:
   
   worker:
     build: .
-    command: uv run worker.py
+    command: uv run python -m services.worker
     depends_on:
       redis:
         condition: service_started
@@ -60,6 +60,8 @@ services:
       - '--config.file=/etc/prometheus/prometheus.yaml'
       - '--storage.tsdb.path=/prometheus'
       - '--storage.tsdb.retention.time=15d'
+    depends_on:
+      - vault
     ports:
       - "9090:9090"
 
@@ -69,6 +71,17 @@ services:
       - "3000:3000"
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
+  
+  vault:
+    build: .
+    command: uv run uvicorn adapters.vault_api:app --host 0.0.0.0 --port 8001
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - DB_URL=postgresql://user:password@db:5432/aegis_vault
+    ports:
+      - "8001:8001"
 
 volumes:
   postgres_data:
