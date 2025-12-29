@@ -8,12 +8,6 @@ pipeline {
     }
 
     stages {
-        stage('Debug Info') {
-            steps {
-                echo "Current Branch: ${env.BRANCH_NAME}"
-            }
-        }
-
         stage('Cleanup Environment') {
             steps {
                 sh 'docker compose -f docker-compose.app.yaml down --remove-orphans'
@@ -51,12 +45,6 @@ pipeline {
         }
 
         stage('Production Handover') {
-            when { 
-                anyOf {
-                    branch 'main'
-                    expression { env.BRANCH_NAME == 'origin/main' }
-                }
-            }
             steps {
                 echo 'Handoff: Starting long-running service on Host...'
                 sh 'docker compose -f docker-compose.app.yaml up -d --no-recreate'
@@ -74,12 +62,7 @@ pipeline {
         }
         success {
             script {
-                if (env.BRANCH_NAME != 'main') {
-                    echo 'Feature test successful. Cleaning up...'
-                    sh 'docker compose -f docker-compose.app.yaml down'
-                } else {
-                    echo 'Production deployment successful. Services is live.'
-                }
+                echo 'Production deployment successful. Services is live.'
             }
         }
     }
