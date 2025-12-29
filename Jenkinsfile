@@ -45,7 +45,12 @@ pipeline {
         }
 
         stage('Production Handover') {
-            when { branch 'main' }
+            when { 
+                anyOf {
+                    branch 'main'
+                    expression { env.BRANCH_NAME == 'origin/main' }
+                }
+            }
             steps {
                 echo 'Handoff: Starting long-running service on Host...'
                 sh 'docker compose -f docker-compose.app.yaml up -d --no-recreate'
