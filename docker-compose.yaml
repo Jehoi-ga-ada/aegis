@@ -2,6 +2,10 @@ services:
   dind:
     image: docker:dind
     privileged: true
+    networks:
+      jenkins_net:
+        aliases:
+          - docker
     environment:
       - DOCKER_TLS_CERTDIR=/certs
     volumes:
@@ -15,8 +19,10 @@ services:
     ports:
       - "8080:8080"
       - "50000:50000"
+    networks:
+      - jenkins_net
     environment:
-      - DOCKER_HOST=tcp://dind:2376
+      - DOCKER_HOST=tcp://docker:2376
       - DOCKER_TLS_VERIFY=1
       - DOCKER_CERT_PATH=/certs/client
     volumes:
@@ -28,3 +34,6 @@ services:
 volumes:
   jenkins-docker-certs:
   jenkins-data:
+
+networks:
+  jenkins_net:
