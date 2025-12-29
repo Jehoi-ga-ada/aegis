@@ -36,6 +36,13 @@ pipeline {
                 sh 'sleep 5' 
             }
         }
+
+        stage('Stress Test') {
+            steps {
+                echo 'Starting Locust Load Test (1 Minute)...'
+                sh 'docker compose -f docker-compose.app.yaml run --rm locust'
+            }
+        }
     }
 
     post {
