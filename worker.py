@@ -5,6 +5,7 @@ from redis.asyncio import Redis
 from aiolimiter import AsyncLimiter
 from datetime import timedelta
 import aiobreaker
+from database import SessionLocal, Account, Trade, init_db
 
 trade_limiter = AsyncLimiter(1, 2)
 
@@ -16,32 +17,48 @@ db_breaker = aiobreaker.CircuitBreaker(
 MESSAGES_PROCESSED = Counter('aegis_worker_messages_total', 'Total prices processed')
 LATEST_BTC_PRICE = Gauge('aegis_btc_price', 'Current BTC price in worker')
 NET_WORTH = Gauge('aegis_net_worth', 'Total value of USD + BTC')
+BTC_HELD = Gauge('aegis_btc_held', 'BTC Held')
+AVAIL_CASH = Gauge('aegis_cash', 'Cash Available')
 
 @db_breaker
-async def execute_trade_logic(cur_price, balance_usd, btc_held):
+async def execute_trade_logic(cur_price):
     async with trade_limiter: 
-        if balance_usd > 0:
-            buy_amount_usd = balance_usd * 0.10
-            btc_to_buy = buy_amount_usd / cur_price
-            
-            balance_usd -= buy_amount_usd
-            btc_held += btc_to_buy
-            
-            print(f"PAPER TRADE: Bought {btc_to_buy:.6f} BTC. Remaining USD: ${balance_usd:.2f}")
-            return balance_usd, btc_held
+        session = SessionLocal()
+        try:
+            account = session.query(Account).first()
+            if account and account.balance_usd > 0:
+                buy_amount_usd = account.balance_usd * 0.10
+                btc_to_buy = buy_amount_usd / cur_price
+                
+                account.balance_usd -= buy_amount_usd
+                account.btc_held += btc_to_buy
+
+                new_trade = Trade(
+                    symbol="BTCUSDT",
+                    price=cur_price,
+                    amount=btc_to_buy
+                )
+                session.add(new_trade)
+
+                session.commit()
+                
+                print(f"PAPER TRADE: Bought {btc_to_buy:.6f} BTC. Remaining USD: ${account.balance_usd:.2f}")
+        except Exception as e:
+            session.rollback()
+            print(f"DATABASE ERROR: Transaction rolled back. {e}")
+            raise
+        finally:
+            session.close()
 
 async def main():
+    init_db()
     r = Redis(host=os.getenv("REDIS_HOST", "localhost"), port=6379, decode_responses=True)
-
     start_http_server(8000)
 
     last_id = '$'
 
     ref_price = None
     threshold = 0.0001
-
-    balance_usd = 1000.0
-    btc_held = 0.0
 
     print("Worker active. Watching for 0.01% price drops...")
 
@@ -53,8 +70,16 @@ async def main():
                 for msg_id, data in messages:
                     cur_price = float(data['p'])
                     MESSAGES_PROCESSED.inc()
-                    LATEST_BTC_PRICE.set(float(data['p']))
-                    NET_WORTH.set(balance_usd + (btc_held * cur_price))
+                    LATEST_BTC_PRICE.set(cur_price)
+                    with SessionLocal() as session:
+                        acc = session.query(Account).first()
+                        if acc:
+                            current_net_worth = acc.balance_usd + (acc.btc_held * cur_price)
+                            NET_WORTH.set(current_net_worth)
+                            BTC_HELD.set(acc.btc_held)
+                            AVAIL_CASH.set(acc.balance_usd)
+                        else:
+                            print("CRITICAL: No account found in DB. Check your seed logic.")
                     
                     if ref_price is None: 
                         ref_price = cur_price
@@ -64,8 +89,7 @@ async def main():
 
                     if chg <= -threshold:
                         print(f"ALERT: Price dropped {chg:.4%}. New Price: {cur_price}")
-
-                        balance_usd, btc_held = await execute_trade_logic(cur_price, balance_usd, btc_held)
+                        await execute_trade_logic(cur_price)
                     
                     ref_price = cur_price
                     last_id = msg_id
