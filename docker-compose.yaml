@@ -4,13 +4,34 @@ services:
     ports:
       - "6379:6379"
   
+  db:
+    image: postgres:15
+    container_name: aegis_postgres
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: aegis_vault
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d aegis_vault"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   producer:
     build: .
     command: uv run producer.py
     depends_on:
-      - redis
+      redis:
+        condition: service_started
+      db:
+        condition: service_healthy
     environment:
       - REDIS_HOST=redis
+      - DB_URL=postgresql://user:password@db:5432/aegis_vault
       - PYTHONUNBUFFERED=1
       - PYTHONDONTWRITEBYTECODE=1
   
@@ -18,9 +39,13 @@ services:
     build: .
     command: uv run worker.py
     depends_on:
-      - redis
+      redis:
+        condition: service_started
+      db:
+        condition: service_healthy
     environment:
       - REDIS_HOST=redis
+      - DB_URL=postgresql://user:password@db:5432/aegis_vault
       - PYTHONUNBUFFERED=1
       - PYTHONDONTWRITEBYTECODE=1
     ports:
@@ -30,8 +55,11 @@ services:
     image: prom/prometheus
     volumes:
       - ./prometheus.yaml:/etc/prometheus/prometheus.yaml:ro
+      - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yaml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=15d'
     ports:
       - "9090:9090"
 
@@ -41,3 +69,7 @@ services:
       - "3000:3000"
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
+
+volumes:
+  postgres_data:
+  prometheus_data:

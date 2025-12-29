@@ -9,6 +9,8 @@ dependencies = [
     "aiolimiter>=1.2.1",
     "binance-sdk-spot>=6.0.0",
     "prometheus-client>=0.23.1",
+    "psycopg2-binary>=2.9.11",
     "redis>=7.1.0",
+    "sqlalchemy>=2.0.45",
     "tornado>=6.5.4",
 ]
