@@ -43,18 +43,33 @@ pipeline {
                 sh 'docker compose -f docker-compose.app.yaml run --rm locust'
             }
         }
+
+        stage('Production Handover') {
+            when { branch 'main' }
+            steps {
+                echo 'Handoff: Starting long-running service on Host...'
+                sh 'docker compose -f docker-compose.app.yaml up -d --no-recreate'
+            }
+        }
     }
 
     post {
         always {
-            echo 'Final Cleanup: Tearing down the workshop...'
+            sh 'docker compose -f docker-compose.app.yaml rm -f locust'
+        }
+        failure {
+            echo 'Build failed. Tearing down broken environment...'
             sh 'docker compose -f docker-compose.app.yaml down'
         }
         success {
-            echo 'Aegis is stable. Logic and integration checks passed!'
-        }
-        failure {
-            echo 'Build failed. Check the logs for logic errors.'
+            script {
+                if (env.BRANCH_NAME != 'main') {
+                    echo 'Feature test successful. Cleaning up...'
+                    sh 'docker compose -f docker-compose.app.yaml down'
+                } else {
+                    echo 'Production deployment successful. Services is live.'
+                }
+            }
         }
     }
 }
