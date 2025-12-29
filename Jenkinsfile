@@ -8,6 +8,12 @@ pipeline {
     }
 
     stages {
+        stage('Debug Info') {
+            steps {
+                echo "Current Branch: ${env.BRANCH_NAME}"
+            }
+        }
+
         stage('Cleanup Environment') {
             steps {
                 sh 'docker compose -f docker-compose.app.yaml down --remove-orphans'
