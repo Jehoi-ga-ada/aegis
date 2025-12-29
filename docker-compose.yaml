@@ -30,12 +30,6 @@ services:
       - jenkins-docker-certs:/certs/client:ro
     depends_on:
       - dind
-  
-  locust:
-    image: locustio/locust
-    volumes:
-      - ./tests:/mnt/locust
-    command: -f /mnt/locust/locustfile.py --headless -u 100 -r 10 --run-time 1m --host http://worker:8000
 
 volumes:
   jenkins-docker-certs:
