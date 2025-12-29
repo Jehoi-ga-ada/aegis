@@ -1,88 +1,30 @@
 services:
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-  
-  db:
-    image: postgres:15
-    container_name: aegis_postgres
+  dind:
+    image: docker:dind
+    privileged: true
     environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: aegis_vault
-    ports:
-      - "5432:5432"
+      - DOCKER_TLS_CERTDIR=/certs
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d aegis_vault"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  producer:
-    build: .
-    command: uv run python -m services.producer
-    depends_on:
-      redis:
-        condition: service_started
-      db:
-        condition: service_healthy
-    environment:
-      - REDIS_HOST=redis
-      - DB_URL=postgresql://user:password@db:5432/aegis_vault
-      - PYTHONUNBUFFERED=1
-      - PYTHONDONTWRITEBYTECODE=1
+      - jenkins-docker-certs:/certs/client
+      - jenkins-data:/var/jenkins_home
   
-  worker:
-    build: .
-    command: uv run python -m services.worker
-    depends_on:
-      redis:
-        condition: service_started
-      db:
-        condition: service_healthy
-    environment:
-      - REDIS_HOST=redis
-      - DB_URL=postgresql://user:password@db:5432/aegis_vault
-      - PYTHONUNBUFFERED=1
-      - PYTHONDONTWRITEBYTECODE=1
+  jenkins:
+    build:
+      context: .
+      dockerfile: Dockerfile.jenkins
     ports:
-      - "8000:8000"
-
-  prometheus:
-    image: prom/prometheus
+      - "8080:8080"
+      - "50000:50000"
+    environment:
+      - DOCKER_HOST=tcp://dind:2376
+      - DOCKER_TLS_VERIFY=1
+      - DOCKER_CERT_PATH=/certs/client
     volumes:
-      - ./prometheus.yaml:/etc/prometheus/prometheus.yaml:ro
-      - prometheus_data:/prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yaml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--storage.tsdb.retention.time=15d'
+      - jenkins-data:/var/jenkins_home
+      - jenkins-docker-certs:/certs/client:ro
     depends_on:
-      - vault
-    ports:
-      - "9090:9090"
-
-  grafana:
-    image: grafana/grafana
-    ports:
-      - "3000:3000"
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-  
-  vault:
-    build: .
-    command: uv run uvicorn adapters.vault_api:app --host 0.0.0.0 --port 8001
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      - DB_URL=postgresql://user:password@db:5432/aegis_vault
-    ports:
-      - "8001:8001"
+      - dind
 
 volumes:
-  postgres_data:
-  prometheus_data:
+  jenkins-docker-certs:
+  jenkins-data:
