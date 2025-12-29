@@ -10,28 +10,28 @@ pipeline {
     stages {
         stage('Cleanup Environment') {
             steps {
-                sh 'docker compose -f docker-compose.app.yml down --remove-orphans'
+                sh 'docker compose -f docker-compose.app.yaml down --remove-orphans'
             }
         }
 
         stage('Build Aegis') {
             steps {
                 echo 'Building images inside the DinD Sandbox...'
-                sh 'docker compose -f docker-compose.app.yml build'
+                sh 'docker compose -f docker-compose.app.yaml build'
             }
         }
 
         stage('Logic Tests') {
             steps {
                 echo 'Running Pytest for Trading Logic...'
-                sh 'docker compose -f docker-compose.app.yml run -T --rm worker uv run pytest tests/test_logic.py'
+                sh 'docker compose -f docker-compose.app.yaml run -T --rm worker uv run pytest tests/test_logic.py'
             }
         }
 
         stage('Integration Up') {
             steps {
                 echo 'Spinning up full Aegis stack...'
-                sh 'docker compose -f docker-compose.app.yml up -d'
+                sh 'docker compose -f docker-compose.app.yaml up -d'
                 
                 sh 'sleep 5' 
             }
@@ -41,7 +41,7 @@ pipeline {
     post {
         always {
             echo 'Final Cleanup: Tearing down the workshop...'
-            sh 'docker compose -f docker-compose.app.yml down'
+            sh 'docker compose -f docker-compose.app.yaml down'
         }
         success {
             echo 'Aegis is stable. Logic and integration checks passed!'
