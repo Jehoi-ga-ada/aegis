@@ -2,6 +2,7 @@ from sqlalchemy import create_engine, Column, Float, String, Integer, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime, timezone
+from ports.repository import TradeRepositoryPort
 import os
 
 Base = declarative_base()
@@ -19,6 +20,16 @@ class Account(Base):
     id = Column(Integer, primary_key=True)
     balance_usd = Column(Float, default=1000.0)
     btc_held = Column(Float, default=0.0)
+
+
+class PostgresTradeAdapter(TradeRepositoryPort):
+    def get_all_trades(self, limit: int = 100):
+        with SessionLocal() as session:
+            return session.query(Trade).order_by(Trade.timestamp.desc()).limit(limit).all()
+        
+    def get_balance(self):
+        with SessionLocal() as session:
+            return session.query(Account).first()
 
 DB_URL = os.getenv("DB_URL", "postgresql://user:password@localhost:5432/aegis_vault")
 engine = create_engine(DB_URL)

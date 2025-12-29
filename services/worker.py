@@ -5,7 +5,7 @@ from redis.asyncio import Redis
 from aiolimiter import AsyncLimiter
 from datetime import timedelta
 import aiobreaker
-from database import SessionLocal, Account, Trade, init_db
+from adapters.database import SessionLocal, Account, Trade, init_db
 
 trade_limiter = AsyncLimiter(1, 2)
 
