@@ -43,27 +43,18 @@ pipeline {
                 sh 'docker compose -f docker-compose.app.yaml run --rm locust'
             }
         }
-
-        stage('Production Handover') {
-            steps {
-                echo 'Handoff: Starting long-running service on Host...'
-                sh 'docker compose -f docker-compose.app.yaml up -d --no-recreate'
-            }
-        }
     }
 
     post {
         always {
-            sh 'docker compose -f docker-compose.app.yaml rm -f locust'
-        }
-        failure {
-            echo 'Build failed. Tearing down broken environment...'
+            echo 'Tests complete. Tearing down the sandbox...'
             sh 'docker compose -f docker-compose.app.yaml down'
         }
         success {
-            script {
-                echo 'Production deployment successful. Services is live.'
-            }
+            echo 'Aegis logic and stress tests passed!'
+        }
+        failure {
+            echo 'Build failed. Check Locust logs or Pytest results.'
         }
     }
 }
